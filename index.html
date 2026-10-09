@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑二维码内容与背景</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; max-width: 600px; margin: 0 auto; background-color: #fafafa; }
+        .box { background: #ffffff; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        details { margin-bottom: 15px; background: #f0f4f8; border-radius: 10px; padding: 10px 15px; }
+        summary { cursor: pointer; font-weight: bold; color: #333; outline: none; user-select: none; }
+        summary:hover { color: #1a73e8; }
+        .config-content { margin-top: 15px; border-top: 1px solid #d0d7de; padding-top: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; margin-top: 12px; color: #444; font-size: 14px;}
+        textarea { width: 100%; height: 80px; padding: 10px; box-sizing: border-box; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; resize: vertical; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 10px; box-sizing: border-box; font-size: 16px; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 6px;}
+        input[type="file"] { margin-top: 5px; font-size: 14px; }
+        button { padding: 10px 20px; font-size: 15px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .btn-blue { background: #1a73e8; margin-top: 8px; }
+        .btn-full { width: 100%; margin-top: 20px; padding: 12px; font-size: 16px; }
+        #qrcode { display: flex; justify-content: center; margin-top: 15px; }
+        .tip { color: #888; font-size: 12px; margin-top: 5px; }
+        .status-msg { text-align: center; margin-top: 10px; font-size: 14px; font-weight: bold; }
+        .preview-img { max-width: 100%; max-height: 150px; display: block; margin-top: 10px; border-radius: 6px; object-fit: contain; }
+    </style>
+</head>
+<body>
+
+    <details>
+        <summary>⚙️ 配置 GitHub Token 和 ImgBB Key（点此展开）</summary>
+        <div class="config-content">
+            <label>GitHub Token (用于存数据):</label>
+            <input type="password" id="tokenInput" placeholder="输入 ghp_xxx" />
+            <label>ImgBB API Key (用于传图片):</label>
+            <input type="password" id="imgbbKeyInput" placeholder="输入 ImgBB 的 API Key" />
+            <button onclick="saveKeys()" style="margin-top:10px; width:100%;">保存配置到本地</button>
+            <div class="tip">密钥只存在你当前浏览器里，不会上传到任何服务器。</div>
+        </div>
+    </details>
+
+    <div class="box">
+        <h3 style="margin-top:0;">📝 编辑扫码内容</h3>
+        <label>扫码后显示的文本或网址：</label>
+        <textarea id="content" placeholder="输入一段文字，或者一个完整的网址..."></textarea>
+        <label>背景墙图片（选填）：</label>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px dashed #1a73e8; margin-top:5px;">
+            <input type="file" id="imageInput" accept="image/*" />
+            <button class="btn-blue" onclick="uploadToImgBB()" style="width:100%;">上传本地图片到 ImgBB</button>
+            <div id="uploadStatus" class="tip"></div>
+            <img id="preview" class="preview-img" src="" style="display:none;" />
+        </div>
+        <label>图片 URL（上传成功后自动填入，也可手动粘贴）：</label>
+        <input type="text" id="bgUrl" placeholder="https://i.ibb.co/..." />
+        <button class="btn-full" onclick="saveContent()">保存所有内容到 GitHub Issue</button>
+        <div id="status" class="status-msg" style="color: #238636;"></div>
+    </div>
+
+    <div class="box" style="text-align:center;">
+        <h3 style="margin-top:0;">📱 固定二维码</h3>
+        <div id="qrcode"></div>
+        <div class="tip">此二维码永远不变，扫码即可看到最新内容</div>
+    </div>
+
+    <script>
+        // ⚠️ 替换成你的信息 ⚠️
+        const REPO = "merryAndrew/QRcode"; 
+        const ISSUE_NUMBER = "1";
+
+        let token = localStorage.getItem('github_token') || '';
+        let imgbbKey = localStorage.getItem('imgbb_key') || '';
+
+        window.onload = () => {
+            document.getElementById('tokenInput').value = token;
+            document.getElementById('imgbbKeyInput').value = imgbbKey;
+            loadData();
+            generateQRCode();
+        };
+
+        function saveKeys() {
+            token = document.getElementById('tokenInput').value.trim();
+            imgbbKey = document.getElementById('imgbbKeyInput').value.trim();
+            localStorage.setItem('github_token', token);
+            localStorage.setItem('imgbb_key', imgbbKey);
+            alert('配置已保存在本地浏览器！');
+            loadData();
+        }
+
+        async function uploadToImgBB() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file) return alert('请先选择一张图片');
+            const apiKey = document.getElementById('imgbbKeyInput').value.trim();
+            if (!apiKey) return alert('请展开上方配置，填写 ImgBB API Key 并保存');
+            const formData = new FormData();
+            formData.append('image', file);
+            const status = document.getElementById('uploadStatus');
+            status.innerText = '⏳ 正在上传到 ImgBB...';
+            try {
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('bgUrl').value = data.data.url;
+                    status.innerText = '✅ 图片上传成功！链接已自动填入下方。';
+                    document.getElementById('preview').src = data.data.url;
+                    document.getElementById('preview').style.display = 'block';
+                } else {
+                    status.innerText = '❌ 上传失败：' + (data.error ? data.error.message : '未知错误');
+                }
+            } catch (err) {
+                status.innerText = '❌ 网络错误，请检查 Key 或网络';
+            }
+        }
+
+        async function loadData() {
+            if (!token) return;
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                const data = await res.json();
+                if (data.body) {
+                    try {
+                        const parsed = JSON.parse(data.body);
+                        document.getElementById('content').value = parsed.content || '';
+                        document.getElementById('bgUrl').value = parsed.bgUrl || '';
+                        if (parsed.bgUrl) {
+                            document.getElementById('preview').src = parsed.bgUrl;
+                            document.getElementById('preview').style.display = 'block';
+                        }
+                    } catch (e) {
+                        document.getElementById('content').value = data.body;
+                    }
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function saveContent() {
+            if (!token) return alert('请展开上方配置，填写 GitHub Token 并保存！');
+            const content = document.getElementById('content').value;
+            const bgUrl = document.getElementById('bgUrl').value.trim();
+            const payload = JSON.stringify({ content: content, bgUrl: bgUrl });
+            const status = document.getElementById('status');
+            status.innerText = '⏳ 保存中...';
+            status.style.color = '#888';
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ body: payload })
+                });
+                if (res.ok) {
+                    status.innerText = '✅ 修改成功！扫码即可查看最新内容。';
+                    status.style.color = '#238636';
+                } else {
+                    status.innerText = '❌ 失败，请检查 Token 权限';
+                    status.style.color = '#d1242f';
+                }
+            } catch (err) { 
+                status.innerText = '❌ 网络错误';
+                status.style.color = '#d1242f';
+            }
+        }
+
+        function generateQRCode() {
+            const viewUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'view.html';
+            new QRCode(document.getElementById("qrcode"), {
+                text: viewUrl,
+                width: 200,
+                height: 200
+            });
+        }
+    </script>
+</body>
+</html>
