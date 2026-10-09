@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查看内容</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            margin: 0; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background-color: #f9f9f9;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 0.5s ease;
+        }
+        .content { 
+            font-size: 22px; 
+            line-height: 1.6; 
+            padding: 20px; 
+            text-align: center; 
+            word-wrap: break-word;
+            background: rgba(255,255,255,0.8);
+            border-radius: 12px;
+            max-width: 80%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="content" id="display">加载中...</div>
+
+    <script>
+        const REPO = "merryAndrew/QRcode"; 
+        const ISSUE_NUMBER = "1";
+
+        async function loadContent() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}`);
+                const data = await res.json();
+                const display = document.getElementById('display');
+                
+                let content = '暂无内容';
+                let bgUrl = '';
+
+                if (data.body) {
+                    try {
+                        const parsed = JSON.parse(data.body);
+                        content = parsed.content || '暂无内容';
+                        bgUrl = parsed.bgUrl || '';
+                    } catch (e) {
+                        content = data.body;
+                    }
+                }
+
+                if (bgUrl) {
+                    document.body.style.backgroundImage = `url('${bgUrl}')`;
+                }
+
+                if (content.startsWith('http://') || content.startsWith('https://')) {
+                    window.location.href = content;
+                } else {
+                    display.innerText = content;
+                }
+            } catch (err) {
+                document.getElementById('display').innerText = '加载失败，请稍后重试';
+            }
+        }
+        loadContent();
+    </script>
+</body>
+</html>
