@@ -3,36 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>查看内容</title>
+    <title>查看信息</title>
     <style>
         body { 
-            font-family: sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             margin: 0; 
             height: 100vh; 
             display: flex; 
             justify-content: center; 
             align-items: center;
-            background-color: #f9f9f9;
+            background-color: #f0f2f5;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             transition: background-image 0.5s ease;
         }
-        .content { 
-            font-size: 22px; 
-            line-height: 1.6; 
-            padding: 20px; 
+        .card { 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px 20px; 
+            border-radius: 16px;
+            width: 80%;
+            max-width: 350px;
             text-align: center; 
-            word-wrap: break-word;
-            background: rgba(255,255,255,0.8);
-            border-radius: 12px;
-            max-width: 80%;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .title { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 15px;
+        }
+        .number-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f4f8;
+            border-radius: 8px;
+            padding: 10px 15px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        .number {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a73e8;
+            letter-spacing: 1px;
+            margin-right: 10px;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .copy-btn:hover {
+            background: #1557b0;
+        }
+        .copy-btn:active {
+            background: #0d47a1;
         }
     </style>
 </head>
 <body>
-    <div class="content" id="display">加载中...</div>
+    <div class="card" id="card">
+        <div class="title" id="title">加载中...</div>
+        <div class="number-box">
+            <div class="number" id="number">---</div>
+            <button class="copy-btn" onclick="copyNumber()">一键复制</button>
+        </div>
+    </div>
 
     <script>
         const REPO = "merryAndrew/QRcode"; 
@@ -42,34 +97,63 @@
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}`);
                 const data = await res.json();
-                const display = document.getElementById('display');
                 
-                let content = '暂无内容';
+                let title = '暂无标题';
+                let number = '暂无号码';
                 let bgUrl = '';
 
                 if (data.body) {
                     try {
                         const parsed = JSON.parse(data.body);
-                        content = parsed.content || '暂无内容';
+                        title = parsed.title || '暂无标题';
+                        number = parsed.number || '暂无号码';
                         bgUrl = parsed.bgUrl || '';
                     } catch (e) {
-                        content = data.body;
+                        // 兼容之前只有纯文本的情况
+                        title = data.body;
                     }
                 }
 
+                // 设置背景
                 if (bgUrl) {
                     document.body.style.backgroundImage = `url('${bgUrl}')`;
                 }
 
-                if (content.startsWith('http://') || content.startsWith('https://')) {
-                    window.location.href = content;
-                } else {
-                    display.innerText = content;
-                }
+                // 渲染内容
+                document.getElementById('title').innerText = title;
+                document.getElementById('number').innerText = number;
+
             } catch (err) {
-                document.getElementById('display').innerText = '加载失败，请稍后重试';
+                document.getElementById('title').innerText = '加载失败';
+                document.getElementById('number').innerText = '请刷新重试';
             }
         }
+
+        // 一键复制功能
+        function copyNumber() {
+            const number = document.getElementById('number').innerText;
+            if (number === '---' || number === '暂无号码') {
+                alert('没有可复制的号码！');
+                return;
+            }
+            
+            // 使用现代的 Clipboard API 进行复制
+            navigator.clipboard.writeText(number).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.innerText;
+                btn.innerText = '✅ 已复制';
+                btn.style.background = '#238636';
+                
+                // 2秒后恢复按钮文字
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = '#1a73e8';
+                }, 2000);
+            }).catch(err => {
+                alert('复制失败，请手动长按复制');
+            });
+        }
+
         loadContent();
     </script>
 </body>
