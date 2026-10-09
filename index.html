@@ -19,6 +19,12 @@
         button:hover { opacity: 0.9; }
         .btn-blue { background: #1a73e8; margin-top: 8px; }
         .btn-full { width: 100%; margin-top: 20px; padding: 12px; font-size: 16px; }
+        
+        /* 新增：配置按钮左右并排的样式 */
+        .btn-row { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-row button { flex: 1; margin-top: 0; }
+        .btn-gray { background: #6c757d; }
+
         #qrcode { display: flex; justify-content: center; margin-top: 15px; }
         .tip { color: #888; font-size: 12px; margin-top: 5px; }
         .status-msg { text-align: center; margin-top: 10px; font-size: 14px; font-weight: bold; }
@@ -34,8 +40,13 @@
             <input type="password" id="tokenInput" placeholder="输入 ghp_xxx" />
             <label>ImgBB API Key (用于传图片):</label>
             <input type="password" id="imgbbKeyInput" placeholder="输入 ImgBB 的 API Key" />
-            <button onclick="saveKeys()" style="margin-top:10px; width:100%;">保存配置到本地</button>
-            <div class="tip">密钥只存在你当前浏览器里，不会上传到任何服务器。</div>
+            
+            <!-- 修改：左右并排的按钮 -->
+            <div class="btn-row">
+                <button class="btn-gray" onclick="clearKeys()">移除配置</button>
+                <button onclick="saveKeys()">保存配置</button>
+            </div>
+            <div class="tip">密钥只存在你当前浏览器里。保存后页面会自动刷新，并拉取 Issue 最新数据。</div>
         </div>
     </details>
 
@@ -46,7 +57,7 @@
         <label>大标题（比如：×××）：</label>
         <input type="text" id="title" placeholder="输入标题..." />
 
-        <label>号码/编号（比如：×××xx号）：</label>
+        <label>号码/编号（比如：×××号）：</label>
         <input type="text" id="number" placeholder="输入编号..." />
 
         <label>背景墙图片（选填）：</label>
@@ -82,17 +93,40 @@
         window.onload = () => {
             document.getElementById('tokenInput').value = token;
             document.getElementById('imgbbKeyInput').value = imgbbKey;
-            loadData();
+            
+            // 页面加载时，如果本地有 Token，自动拉取 Issue 数据
+            if (token) {
+                loadData();
+            }
             generateQRCode();
         };
 
+        // 保存配置（新增：保存后刷新页面）
         function saveKeys() {
-            token = document.getElementById('tokenInput').value.trim();
-            imgbbKey = document.getElementById('imgbbKeyInput').value.trim();
-            localStorage.setItem('github_token', token);
-            localStorage.setItem('imgbb_key', imgbbKey);
-            alert('配置已保存在本地浏览器！');
-            loadData();
+            const t = document.getElementById('tokenInput').value.trim();
+            const k = document.getElementById('imgbbKeyInput').value.trim();
+            
+            if (!t || !k) {
+                alert('请把两个密钥都填写完整！');
+                return;
+            }
+            
+            localStorage.setItem('github_token', t);
+            localStorage.setItem('imgbb_key', k);
+            alert('配置已保存在本地！点击确定后页面将刷新。');
+            
+            // 刷新页面，触发 loadData() 自动读取 Issue 数据
+            window.location.reload();
+        }
+
+        // 移除配置（新增）
+        function clearKeys() {
+            if (confirm('确定要移除本地保存的配置吗？')) {
+                localStorage.removeItem('github_token');
+                localStorage.removeItem('imgbb_key');
+                alert('配置已移除！点击确定后页面将刷新。');
+                window.location.reload();
+            }
         }
 
         async function uploadToImgBB() {
